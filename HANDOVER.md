@@ -881,6 +881,11 @@ recorded. Decide deliberately — see §10.
 8. **`Attributes` escaping** — two different attribute sets must never collide.
 9. **The area/perimeter formulas run identically** wherever they run, if you keep two
    implementations.
+10. **File text never becomes page markup.** A description is someone else's HTML: reduce it
+    in a document of its own (`DOMParser`), never through `innerHTML` on an element of the
+    page, which loads `<img src=x onerror=...>` and runs it even when detached. Put warnings
+    and errors (they quote placemark and file names) on the page as text. Fixed in the
+    browser version 2026-10-01; `web/test/browser.test.mjs` checks it in Chrome.
 
 ### A word on maintaining two implementations
 

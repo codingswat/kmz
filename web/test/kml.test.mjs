@@ -235,3 +235,28 @@ test("nothing raises on input that is not a document", () => {
   assert.ok(parseDocument("<kml><unclosed>", "bad.kml").warnings.length > 0);
   assert.ok(parseDocument("not xml at all", "bad.kml").warnings.length > 0);
 });
+
+test("a description is never parsed in the page's own document", () => {
+  // In a browser, markup given to an element the page's document made loads
+  // <img src=x onerror=...> and runs the handler, attached or not; a document
+  // made by DOMParser runs and loads nothing. browser.test.mjs shows both in
+  // Chrome; this catches kml.js reaching for the page's document again
+  // wherever there is no Chrome to run that.
+  const hostile =
+    '<kml><Placemark><name>p</name><description><![CDATA[<p>Survey</p>' +
+    '<img src="x" onerror="alert(1)">]]></description>' +
+    "<Point><coordinates>46.7,24.7</coordinates></Point></Placemark></kml>";
+  const asked = [];
+  const original = document.createElement;
+  document.createElement = (name) => {
+    asked.push(name);
+    return original(name);
+  };
+  try {
+    const [point] = parseDocument(hostile, "hostile.kml").points;
+    assert.equal(point.description, "Survey", "the description was not reduced to its text");
+  } finally {
+    document.createElement = original;
+  }
+  assert.deepEqual(asked, [], "kml.js made an element in the page's own document");
+});

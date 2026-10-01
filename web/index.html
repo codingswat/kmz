@@ -79,6 +79,14 @@ const result = document.getElementById("result");
 
 let selected = [];
 
+/** An element holding `text` as text, never as markup. */
+function block(tag, className, text) {
+  const element = document.createElement(tag);
+  element.className = className;
+  element.textContent = text;
+  return element;
+}
+
 function acceptable(files) {
   return Array.from(files).filter((file) => /\.(kml|kmz)$/i.test(file.name));
 }
@@ -137,11 +145,12 @@ convertButton.addEventListener("click", async () => {
     }
 
     const { summary, workbook, filename } = await convert(files);
-    const lines = [`<div class="summary">${summaryText(summary)}</div>`];
-    for (const warning of summary.warnings) {
-      lines.push(`<p class="warning">${warning}</p>`);
-    }
-    result.innerHTML = lines.join("");
+    // Warnings name the file's own placemarks, so they go in as text: as
+    // markup, a name could run script on this page. Test: browser.test.mjs.
+    result.replaceChildren(
+      block("div", "summary", summaryText(summary)),
+      ...summary.warnings.map((warning) => block("p", "warning", warning)),
+    );
     result.hidden = false;
 
     if (workbook) {
@@ -159,7 +168,7 @@ convertButton.addEventListener("click", async () => {
       URL.revokeObjectURL(url);
     }
   } catch (error) {
-    result.innerHTML = `<p class="error">Something went wrong: ${error.message}</p>`;
+    result.replaceChildren(block("p", "error", `Something went wrong: ${error.message}`));
     result.hidden = false;
   } finally {
     convertButton.textContent = "Convert";

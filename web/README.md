@@ -81,6 +81,12 @@ regenerated from the Python implementation each time rather than committed, so
 a drift between the two fails the build instead of being checked against a
 stale reference.
 
+`test/browser.test.mjs` is the one test that runs a real browser: it opens the
+committed single file in headless Chrome, feeds it a map file whose description
+and placemark names carry `<img onerror>` script, and checks none of it runs
+and the names show as text. It finds Chrome itself (`CHROME=/path` overrides),
+skips when there is none, and fails instead of skipping in CI.
+
 ### The one place a test is weaker than it looks
 
 `src/kml.js` needs a DOM and Node has none, and this project has no

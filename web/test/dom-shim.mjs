@@ -4,8 +4,8 @@
  * READ THIS BEFORE TRUSTING A PASS FROM IT.
  *
  * kml.js is the one module that needs a DOM: it calls `new DOMParser()` on
- * the KML and `document.createElement("div")` plus `innerHTML` on the HTML
- * inside a <description>. Node has neither, and this repository has no
+ * the KML as XML, and again on the HTML inside a <description> as a document
+ * of its own. Node has no DOMParser, and this repository has no
  * package.json and no node_modules on purpose, so a library is not an option.
  * What follows is a hand-written XML reader and a much smaller HTML one,
  * written to be sufficient for the three sample documents in the fixture and
@@ -29,11 +29,17 @@
  *   which is what kml.js looks at), entity declarations, DTDs, XML character
  *   validity, encoding detection, or CSS selectors beyond a comma-separated
  *   list of bare tag names. Anything it does not implement, it throws on,
- *   rather than quietly returning something plausible.
+ *   rather than quietly returning something plausible -- except a <head>:
+ *   an HTML document's markup all goes in its <body>, so a leading <title>
+ *   is checked in browser.test.mjs instead.
  *
  * So the browser check described in web/README.md remains the authority for
  * "kml.js works in a browser". This is the check for "kml.js agrees with
  * Python", which is a different question and was previously unasked.
+ *
+ * It still installs a `document`, though kml.js no longer uses one, so that
+ * kml.test.mjs can see it is never asked for an element: markup given to an
+ * element of the page's own document runs its script in a browser.
  */
 
 // HTML elements that never have children and never need closing.
@@ -305,6 +311,14 @@ class XmlDocument {
 
 class DOMParserShim {
   parseFromString(source, type) {
+    if (type === "text/html") {
+      // Everything in <body>: none of HTML's tree construction, see the header.
+      const html = new Element("html");
+      const body = new Element("body");
+      html.append(body);
+      parseMarkup(source, { html: true, into: body });
+      return { documentElement: html, body };
+    }
     if (type !== "application/xml" && type !== "text/xml") {
       throw new Error(`dom-shim: parseFromString type "${type}" is not implemented`);
     }

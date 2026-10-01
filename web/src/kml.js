@@ -114,8 +114,13 @@ export function plainText(raw) {
   if (!raw || !raw.trim()) return "";
   if (!raw.includes("<")) return raw.split(/\s+/).join(" ");
 
-  const holder = document.createElement("div");
-  holder.innerHTML = raw;
+  // A document of its own, never an element of the page's: markup given to
+  // one of the page's elements loads its images and runs their onerror
+  // handlers, attached or not, and a description is someone else's file. A
+  // document made by DOMParser runs no script and loads nothing.
+  // The whole document, not its <body>: a leading <title> lands in <head>,
+  // and Python keeps its text. Tests: browser.test.mjs, kml.test.mjs.
+  const holder = new DOMParser().parseFromString(raw, "text/html").documentElement;
   // Give breaks and block elements a separator, or words either side of them
   // run together once the tags are gone.
   for (const element of holder.querySelectorAll("br, p, div, li, tr")) {
