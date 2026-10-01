@@ -66,8 +66,12 @@ const PROBE = `<script>
   const report = { ran: [] };
   window.__flag = (name) => report.ran.push(name);
   const settle = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const shown = async () => {
+  // Each case gets its own control, started the moment its result is on
+  // the page, so a handler that would have run in that window is seen to.
+  const shown = async (label) => {
     for (let tries = 0; tries < 100 && result.hidden; tries += 1) await settle(50);
+    document.createElement("div").innerHTML =
+      '<img src="missing-' + label + '.png" onerror="__flag(\\'' + label + ' control\\')">';
     await settle(500); // time for a missing image's error event
     return {
       shown: !result.hidden,
@@ -90,7 +94,7 @@ const PROBE = `<script>
   input.files = files.files;
   input.dispatchEvent(new Event("change"));
   convertButton.click();
-  report.conversion = await shown();
+  report.conversion = await shown("conversion");
 
   // The page's last-resort message. Its text is whatever the error says,
   // which is not the page's to vouch for.
@@ -102,7 +106,7 @@ const PROBE = `<script>
   }];
   convertButton.disabled = false;
   convertButton.click();
-  report.failure = await shown();
+  report.failure = await shown("failure");
 
   const out = document.createElement("pre");
   out.id = "report";
@@ -121,6 +125,7 @@ const PROBE = `<script>
 async function runInChrome() {
   const scratch = mkdtempSync(join(tmpdir(), "kmz-browser-"));
   let browser;
+  let abandon;
   try {
     const html = readFileSync(built, "utf8");
     const at = html.lastIndexOf("</body>");
@@ -142,6 +147,17 @@ async function runInChrome() {
       ],
       { detached: true, stdio: ["ignore", "pipe", "ignore"] },
     );
+    // Stopped halfway (Ctrl-C, a cancelled run), `finally` never runs and a
+    // detached Chrome would outlive the test, with its folder.
+    abandon = () => {
+      try {
+        process.kill(-browser.pid, "SIGKILL");
+      } catch {}
+      rmSync(scratch, { recursive: true, force: true });
+      process.exit(130);
+    };
+    process.once("SIGINT", abandon);
+    process.once("SIGTERM", abandon);
     const dom = await new Promise((resolve, reject) => {
       let printed = "";
       const deadline = setTimeout(() => reject(new Error("Chrome printed no page within 60 s")), 60_000);
@@ -164,6 +180,10 @@ async function runInChrome() {
     assert.ok(found, "the probe never finished: Chrome printed the page without its report");
     return JSON.parse(decodeURIComponent(found[1]));
   } finally {
+    if (abandon) {
+      process.off("SIGINT", abandon);
+      process.off("SIGTERM", abandon);
+    }
     await stop(browser);
     rmSync(scratch, { recursive: true, force: true });
   }
@@ -202,10 +222,21 @@ test("file text cannot run script in the page or become its markup", { skip: !ch
   assert.ok(conversion.shown, "the conversion never showed a result");
   assert.ok(failure.shown, "the failure path never showed a result");
 
+  for (const label of ["conversion", "failure"]) {
+    assert.ok(
+      report.ran.includes(`${label} control`),
+      `the ${label} control did not run in its window, so a planted handler might not have either`,
+    );
+  }
+
   assert.ok(!report.ran.includes("description"), "a description's onerror ran in the page");
   assert.ok(!report.ran.includes("warning"), "a placemark name's onerror ran in a warning");
   assert.ok(!report.ran.includes("error"), "an error message's onerror ran");
-  assert.deepEqual(report.ran, ["control"]);
+  assert.deepEqual(
+    [...report.ran].sort(),
+    ["control", "conversion control", "failure control"],
+    "something other than the controls ran",
+  );
 
   assert.ok(
     conversion.text.includes("skipped <b>bold</b> (bad coordinates)"),
