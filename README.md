@@ -227,6 +227,16 @@ machine run them under Xvfb:
 xvfb-run -a pytest
 ```
 
+### PC tester
+
+The PC tester (the owner's Windows PC, running this repo's tests unattended) tests every branch pushed under `ci/`:
+
+```bash
+git push origin HEAD:ci/my-change
+```
+
+Within a few minutes, for commits under 48 hours old, one result file per commit lands on the `ci-results` branch, in `results/<day>-<first 8 characters of the commit>.md`: GREEN or RED, the commands, and the last lines of their output. It runs `pip install -e ".[gui,web,dev]"`, then `python -m pytest -q` under a virtual display, the web tests (`node --test "web/test/*.test.mjs"`) and `mypy kmz_points/`; the one real-Chrome check is skipped there (no Chrome).
+
 ## Layout
 
 | Path | Purpose |
