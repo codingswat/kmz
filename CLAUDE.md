@@ -22,6 +22,9 @@ in a notes file.
 
 ## Rules that must hold
 
+- **Origin: drone-licence submissions to GACA and SANS.** The five coordinate formats and the extract-everything Attributes/ExtendedData output exist for that form; keep that output compatible.
+- Ask before removing or reshaping any coordinate format or attribute output.
+
 - **The two implementations (Python and JavaScript) must agree.** A generated-fixture
   cross-check enforces it; keep that check alive and passing.
 - **Core invariant: nothing raises on bad input.** One bad file must never abort a batch.
